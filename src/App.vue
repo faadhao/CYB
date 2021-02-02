@@ -2,7 +2,7 @@
   div#app
     b-navbar.fixed-top.bg-black(toggleable='lg' type='dark')
       b-navbar-brand(to="/") 
-        img.ml-1(src="../../images/logo.png" width="90" height="40")
+        img.ml-1(:src="'./icon.png'" width="90" height="40")
       b-navbar-toggle(target='nav-collapse')
       b-collapse#nav-collapse(is-nav)
         b-navbar-nav
