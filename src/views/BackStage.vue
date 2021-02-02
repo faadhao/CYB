@@ -258,7 +258,10 @@ export default {
       },
       files: {
         films: {},
-        images: {}
+        images: {
+          image: '',
+          model: ''
+        }
       },
       newCarousel: {
         title: ''
