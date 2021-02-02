@@ -6,7 +6,7 @@
         b-col(cols='12')
           b-card(img-src="../../004.jpg" no-body).bg
             b-card-body.card-img-overlay.d-flex.justify-content-center.align-items-center
-              b-card-text.letter-spacing.w-50.p-5 {{ about }}
+              b-card-text.letter-spacing.w50.pd {{ about }}
       h2.my-5.h2 成員介紹
       b-row#member.mb-3.mt
         b-col(cols="12" lg="4" v-for="member in members" :key="member._id" :id="member.memberName")
@@ -143,5 +143,19 @@ export default {
   .mb {
     margin-bottom: 0;
   }
+}
+@media (min-width: 992px) {
+  #about .pd {
+    padding: 5rem !important;
+  }
+  #about .w50 {
+    width: 50% !important;
+  }
+}
+#about .pd {
+  padding: 0;
+}
+#about .w50 {
+  width: 75%;
 }
 </style>
