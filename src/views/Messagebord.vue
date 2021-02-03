@@ -4,8 +4,8 @@
       br
       h2.text-white.mt-3.h2 留言板
       b-row
-        b-col.max-height(cols="12" lg="4" v-for="(message, index) in messages" :key="message._id")
-          b-card.my-5(no-body)
+        b-col.max-height.my-5(cols="12" lg="4" v-for="(message, index) in messages" :key="message._id")
+          b-card(no-body)
             b-card-header.d-flex.justify-content-end
               font-awesome-icon.mb-1(:icon="['far', 'user-circle']" size="lg")
               h4.flex-fill.ml-1 {{ message.user }}
