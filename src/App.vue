@@ -253,5 +253,6 @@ export default {
   border-left: 10px solid cyan;
   padding-left: 10px;
   text-shadow: 0 0 10px rgba(255,255,255,1), 0 0 20px rgba(255,255,255,0.8), 0 0 40px rgba(255,255,255,0.5);
+  margin-left: 10px;
 }
 </style>
