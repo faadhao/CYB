@@ -54,7 +54,7 @@ const routes = [
     // which is lazy-loaded when the route is visited.
     component: () => import(/* webpackChunkName: "connection" */ '../views/Messagebord.vue'),
     meta: {
-      title: '琴音部 | 聯絡我們'
+      title: '琴音部 | 留言板'
     }
   },
   {
