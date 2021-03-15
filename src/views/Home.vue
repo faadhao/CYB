@@ -14,53 +14,53 @@
 </template>
 
 <script>
-  export default {
-    data() {
-      return {
-        slide: 0,
-        sliding: null,
-        file: {
-          films: {},
-          images: {
-            0:{
-              _id:"5ff7b1c99f8fdc055c3388c3",
-              src:"https://picsum.photos/1024/480/?image=52",
-              title:""
-            }
+export default {
+  data () {
+    return {
+      slide: 0,
+      sliding: null,
+      file: {
+        films: {},
+        images: {
+          0: {
+            _id: '5ff7b1c99f8fdc055c3388c3',
+            src: 'https://picsum.photos/1024/480/?image=52',
+            title: ''
           }
         }
       }
-    },
-    methods: {
-      onSlideStart(slide) {
-        this.sliding = true
-      },
-      onSlideEnd(slide) {
-        this.sliding = false
-      }
-    },
-    mounted() {
-      this.axios.get(process.env.VUE_APP_API + '/home/getFile')
-        .then(res => {
-          if (res.data.success) {
-            let image = []
-            let film = []
-            res.data.result.map(file => {
-              if (file.file === undefined) {
-                film.push(file)
-                this.file.films = film
-              } else {
-                image.push(file)
-                this.file.images = image
-                this.file.images.map(image => {
-                  image.src = process.env.VUE_APP_API + '/home/img/' + image.file
-                })
-              }
-            })
-          }
-        })
     }
+  },
+  methods: {
+    onSlideStart (slide) {
+      this.sliding = true
+    },
+    onSlideEnd (slide) {
+      this.sliding = false
+    }
+  },
+  mounted () {
+    this.axios.get(process.env.VUE_APP_API + '/home/getFile')
+      .then(res => {
+        if (res.data.success) {
+          const image = []
+          const film = []
+          res.data.result.map(file => {
+            if (file.file === undefined) {
+              film.push(file)
+              this.file.films = film
+            } else {
+              image.push(file)
+              this.file.images = image
+              this.file.images.map(image => {
+                image.src = process.env.VUE_APP_API + '/home/img/' + image.file
+              })
+            }
+          })
+        }
+      })
   }
+}
 </script>
 
 <style>
