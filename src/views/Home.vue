@@ -24,7 +24,7 @@ export default {
         images: {
           0: {
             _id: '5ff7b1c99f8fdc055c3388c3',
-            src: 'https://picsum.photos/1024/480/?image=52',
+            src: 'https://venturebeat.com/wp-content/uploads/2014/10/loading_desktop_by_brianmccumber-d41z4h6.gif?w=1200&strip=all',
             title: ''
           }
         }
