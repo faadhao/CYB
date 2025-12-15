@@ -14,11 +14,15 @@
 </template>
 
 <script>
+import API from '../api'
+import { handleError } from '../utils/errorHandler'
+
 export default {
   data () {
     return {
       slide: 0,
       sliding: null,
+      loading: false,
       file: {
         films: {},
         images: {
@@ -40,24 +44,29 @@ export default {
     }
   },
   mounted () {
-    this.axios.get(process.env.VUE_APP_API + '/home/getFile')
+    this.loading = true
+    this.axios.get(API.home.getFile)
       .then(res => {
         if (res.data.success) {
           const image = []
           const film = []
-          res.data.result.map(file => {
+          res.data.result.forEach(file => {
             if (file.file === undefined) {
               film.push(file)
-              this.file.films = film
             } else {
+              file.src = API.home.img(file.file)
               image.push(file)
-              this.file.images = image
-              this.file.images.map(image => {
-                image.src = process.env.VUE_APP_API + '/home/img/' + image.file
-              })
             }
           })
+          this.file.films = film
+          this.file.images = image.length > 0 ? image : this.file.images
         }
+      })
+      .catch(err => {
+        handleError(err, this)
+      })
+      .finally(() => {
+        this.loading = false
       })
   }
 }

@@ -34,13 +34,17 @@
 </template>
 
 <script>
+import API from '../api'
+import { handleError } from '../utils/errorHandler'
+
 export default {
   name: 'About',
   data () {
     return {
       connections: [],
       about: '',
-      members: []
+      members: [],
+      loading: false
     }
   },
   methods: {
@@ -49,40 +53,38 @@ export default {
     }
   },
   mounted () {
-    this.axios.get(process.env.VUE_APP_API + '/about/')
-      .then(res => {
-        if (res.data.success) {
-          this.about = res.data.result[0].about
+    this.loading = true
+    
+    // 使用 Promise.all 同時載入所有數據
+    Promise.all([
+      this.axios.get(API.about.base),
+      this.axios.get(API.member.about),
+      this.axios.get(API.connection.connectUs)
+    ])
+      .then(([aboutRes, memberRes, connectionRes]) => {
+        // 處理關於我們
+        if (aboutRes.data.success) {
+          this.about = aboutRes.data.result[0].about
+        }
+        
+        // 處理成員資料
+        if (memberRes.data.success) {
+          this.members = memberRes.data.result.map(member => ({
+            ...member,
+            image: API.member.file(member.file)
+          }))
+        }
+        
+        // 處理聯絡資訊
+        if (connectionRes.data.success) {
+          this.connections = connectionRes.data.result[0]
         }
       })
       .catch(err => {
-        this.$swal({
-          icon: 'error',
-          title: '錯誤',
-          text: err.response.data.message
-        })
+        handleError(err, this)
       })
-    this.axios.get(process.env.VUE_APP_API + '/member/about')
-      .then(res => {
-        if (res.data.success) {
-          this.members = res.data.result
-          this.members.map(member => {
-            member.image = process.env.VUE_APP_API + '/member/file/' + member.file
-          })
-        }
-      })
-      .catch(err => {
-        this.$swal({
-          icon: 'error',
-          title: '錯誤',
-          text: err.response.data.message
-        })
-      })
-    this.axios.get(process.env.VUE_APP_API + '/connection/connectUs')
-      .then(res => {
-        if (res.data.success) {
-          this.connections = res.data.result[0]
-        }
+      .finally(() => {
+        this.loading = false
       })
   }
 }

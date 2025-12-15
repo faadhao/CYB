@@ -19,6 +19,9 @@
 </template>
 
 <script>
+import API from '../api'
+import { handleError, handleSuccess, handleWarning } from '../utils/errorHandler'
+
 export default {
   name: 'tickets',
   data() {
@@ -27,7 +30,8 @@ export default {
       selected: {},
       options: [],
       seats: 1,
-      totalPrice: 0
+      totalPrice: 0,
+      loading: false
     }
   },
   computed: {
@@ -40,9 +44,15 @@ export default {
   },
   methods: {
     onSubmit() {
+      // 驗證座位數
+      if (this.seats > this.selected.seats) {
+        handleWarning('座位數不足，請重新選擇', this)
+        return
+      }
+
       let data
       let booked
-      this.tickets.map(ticket => {
+      this.tickets.forEach(ticket => {
         if (ticket._id === this.selected.id) {
           booked = {
             t_id: ticket.c_id._id,
@@ -54,28 +64,25 @@ export default {
           }
         }
       })
-      this.axios.post(process.env.VUE_APP_API + '/ticket/bookTicket', booked)
+
+      this.loading = true
+      this.axios.post(API.ticket.bookTicket, booked)
         .then(res => {
           if (res.data.success) {
-            this.axios.patch(process.env.VUE_APP_API + '/ticket/' + data.id, { seats: data.seats })
-              .then(res2 => {
-                if (res2.data.success) {
-                  this.$swal({
-                    icon: 'success',
-                    title: '成功',
-                    text: '訂票成功，請確認 會員中心 > 我的票券'
-                  })
-                  this.$router.push({name: 'UserCenter'})
-                }
-              })
+            return this.axios.patch(API.ticket.getById(data.id), { seats: data.seats })
+          }
+        })
+        .then(res2 => {
+          if (res2 && res2.data.success) {
+            handleSuccess('訂票成功，請到會員中心查看票券', this)
+            this.$router.push({name: 'UserCenter'})
           }
         })
         .catch(err => {
-          this.$swal({
-            icon: 'error',
-            title: '錯誤',
-            text: err.response.data.message
-          })
+          handleError(err, this)
+        })
+        .finally(() => {
+          this.loading = false
         })
     },
     onReset() {
@@ -83,24 +90,49 @@ export default {
     }
   },
   mounted() {
-    this.axios.get(process.env.VUE_APP_API + '/ticket/tickets')
+    this.loading = true
+    this.axios.get(API.ticket.list)
       .then(res => {
         if (res.data.success) {
           this.tickets = res.data.result
-          this.tickets.map(ticket => {
-            this.options.push(
-              {value: {id: ticket._id, seats: ticket.seats}, text: ticket.title}
+          
+          // 處理選項清單
+          this.options = this.tickets.map(ticket => ({
+            value: { id: ticket._id, seats: ticket.seats, price: ticket.price },
+            text: ticket.title
+          }))
+
+          // 如果有預選的演出 ID，設定預設選項
+          if (this.concertId) {
+            const selectedTicket = this.tickets.find(ticket => 
+              ticket.c_id._id === this.concertId
             )
-          })
+            if (selectedTicket) {
+              this.selected = {
+                id: selectedTicket._id,
+                seats: selectedTicket.seats,
+                price: selectedTicket.price
+              }
+              this.totalPrice = selectedTicket.price
+            }
+          }
+
+          // 如果沒有預選，選擇第一個
+          if (!this.selected.id && this.tickets.length > 0) {
+            this.selected = {
+              id: this.tickets[0]._id,
+              seats: this.tickets[0].seats,
+              price: this.tickets[0].price
+            }
+            this.totalPrice = this.tickets[0].price
+          }
         }
       })
-      .then(res => {
-        this.tickets.map(ticket => {
-          if (this.concertId === ticket.c_id._id) {
-            this.selected = {id: ticket._id, seats: ticket.seats}
-            this.totalPrice = ticket.price
-          }
-        })
+      .catch(err => {
+        handleError(err, this)
+      })
+      .finally(() => {
+        this.loading = false
       })
   }
 }

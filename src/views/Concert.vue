@@ -14,11 +14,15 @@
 </template>
 
 <script>
+import API from '../api'
+import { handleError, handleWarning } from '../utils/errorHandler'
+
 export default {
   name: 'Concert',
   data () {
     return {
-      concerts: []
+      concerts: [],
+      loading: false
     }
   },
   computed: {
@@ -29,11 +33,7 @@ export default {
   methods: {
     bookTicket (id) {
       if (this.user.id.length === 0) {
-        this.$swal({
-          icon: 'error',
-          title: '錯誤',
-          text: '請先登入!'
-        })
+        handleWarning('請先登入才能訂票', this)
       } else {
         this.$store.commit('bookTicket', id)
         this.$router.push('/tickets')
@@ -49,11 +49,18 @@ export default {
     }
   },
   mounted () {
-    this.axios.get(process.env.VUE_APP_API + '/concert/concerts')
+    this.loading = true
+    this.axios.get(API.concert.list)
       .then(res => {
         if (res.data.success) {
           this.concerts = res.data.result
         }
+      })
+      .catch(err => {
+        handleError(err, this)
+      })
+      .finally(() => {
+        this.loading = false
       })
   }
 }

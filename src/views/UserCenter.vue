@@ -54,6 +54,9 @@
 
 <script>
 import VueQrcode from 'vue-qrcode'
+import API from '../api'
+import { handleError } from '../utils/errorHandler'
+
 export default {
   name: 'UserCenter',
   data() {
@@ -62,7 +65,8 @@ export default {
       nameEdit: false,
       accountEdit: false,
       tickets: {},
-      value: {}
+      value: {},
+      loading: false
     }
   },
   components: {
@@ -77,26 +81,27 @@ export default {
       this[edit] = false
     },
     save(edit, data) {
-      this.axios.patch(process.env.VUE_APP_API + '/users/edit', data)
+      this.axios.patch(API.users.edit, data)
         .then(res => {
           if (res.data.success) {
             this[edit] = false
             this.user.name = data.userName
             this.user.account = data.account
+            this.$swal({
+              icon: 'success',
+              title: '成功',
+              text: '資料更新成功'
+            })
           } else {
             this.$swal({
               icon: 'error',
-              title: '發生錯誤',
+              title: '更新失敗',
               text: res.data.message
             })
           }
         })
         .catch(err => {
-          this.$swal({
-            icon: 'error',
-            title: '發生錯誤',
-            text: err.response.data.message
-          })
+          handleError(err, this)
         })
     },
     approach(id) {
@@ -104,35 +109,40 @@ export default {
     }
   },
   mounted() {
-    this.axios.get(process.env.VUE_APP_API + '/users/user')
+    this.loading = true
+    this.axios.get(API.users.user)
       .then(res => {
         if (res.data.success) {
+          const result = res.data.result
           this.user = {
-            id: res.data.result._id,
-            account: res.data.result.account,
-            name: res.data.result.userName,
+            id: result._id,
+            account: result.account,
+            name: result.userName,
             model: {
-              userName: res.data.result.userName,
-              account: res.data.result.account
+              userName: result.userName,
+              account: result.account
             },
-            gender:　res.data.result.gender
+            gender: result.gender,
+            userGender: result.gender === 'male' ? '男' : '女'
           }
-          this.tickets = res.data.result.tickets
-          this.tickets.map(ticket => {
-            ticket.tid = ticket._id
-            ticket.title = ticket.t_id.title
-            ticket.time = ticket.t_id.time
-            ticket.location = ticket.t_id.location
-            ticket.quantity = ticket.quantity
-            ticket.cid = ticket.t_id._id
-            delete ticket.t_id
-          })
-          if (this.user.gender === 'male') {
-            this.user.userGender = '男'
-          } else if (this.user.gender === 'female') {
-            this.user.userGender = '女'
-          }
+          
+          // 處理票券數據
+          this.tickets = result.tickets.map(ticket => ({
+            tid: ticket._id,
+            title: ticket.t_id.title,
+            time: ticket.t_id.time,
+            location: ticket.t_id.location,
+            quantity: ticket.quantity,
+            paid: ticket.paid || false,
+            cid: ticket.t_id._id
+          }))
         }
+      })
+      .catch(err => {
+        handleError(err, this)
+      })
+      .finally(() => {
+        this.loading = false
       })
   }
 }

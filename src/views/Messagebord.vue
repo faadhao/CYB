@@ -39,15 +39,18 @@
             h6.mr-auto &nbsp;
 </template>
 
-</script>
 <script>
+import API from '../api'
+import { handleError, handleSuccess } from '../utils/errorHandler'
+
 export default {
   name: 'Connection',
   data() {
     return {
       messages: [],
       reply: [],
-      message: ''
+      message: '',
+      loading: false
     }
   },
   computed: {
@@ -55,141 +58,127 @@ export default {
       return this.$store.state.user
     }
   },
-  methods: {onSubmit(id, index) {
-      let data = {}
-      data[0] = this.messages[index]
-      delete data[0]._id
-      delete data[0].replyed
-      data[0].reply = this.reply[index]
-      this.axios.patch(process.env.VUE_APP_API + '/message/reply/' + id, data[0])
+  methods: {
+    onSubmit(id, index) {
+      let data = {
+        user: this.messages[index].user,
+        userId: this.messages[index].userId,
+        message: this.messages[index].message,
+        reply: this.reply[index]
+      }
+      
+      this.axios.patch(API.message.reply(id), data)
         .then(res => {
           if (res.data.success) {
             this.messages[index].replyed = true
-            this.reply = ''
-            location.reload()
+            this.messages[index].reply = this.reply[index]
+            this.reply[index] = ''
+            handleSuccess('回覆成功', this)
           } else {
             this.$swal({
               icon: 'error',
-              title: '發生錯誤',
+              title: '回覆失敗',
               text: res.data.message
             })
           }
         })
         .catch(err => {
-          this.$swal({
-            icon: 'error',
-            title: '發生錯誤',
-            text: err.response.data.message
-          })
+          handleError(err, this)
         })
     },
     reset() {
       this.reply = ''
     },
     deleteMessage(id) {
-      this.axios.delete(process.env.VUE_APP_API + '/message/' + id)
+      this.axios.delete(API.message.getById(id))
         .then(res => {
           if (res.data.success) {
-            location.reload()
+            handleSuccess('删除成功', this)
+            // 移除該留言
+            this.messages = this.messages.filter(msg => msg._id !== id)
           }
         })
         .catch(err => {
-          console.log(err)
-          this.$swal({
-            icon: 'error',
-            title: '發生錯誤',
-            text: err.response.data.message
-          })
+          handleError(err, this)
         })
     },
     muteUser(id) {
-      this.axios.patch(process.env.VUE_APP_API + '/users/' + id, { messageAble: false })
+      this.axios.patch(API.users.getById(id), { messageAble: false })
         .then(res => {
           if (res.data.success) {
-            location.reload()
+            handleSuccess('禁言成功', this)
+            // 重新載入留言
+            this.loadMessages()
           }
         })
         .catch(err => {
-          this.$swal({
-            icon: 'error',
-            title: '發生錯誤',
-            text: err.response.data.message
-          })
+          handleError(err, this)
         })
     },
     sendMessage() {
-      let data = {message : this.message}
-      this.axios.post(process.env.VUE_APP_API + '/message/', data)
+      let data = { message: this.message }
+      this.axios.post(API.message.base, data)
         .then(res => {
           if (res.data.success) {
-            this.$swal({
-              icon: 'success',
-              title: '成功',
-              text: '留言完成'
-            })
-            location.reload()
+            handleSuccess('留言成功', this)
+            this.message = ''
+            this.$bvModal.hide('message')
+            // 重新載入留言
+            this.loadMessages()
           }
         })
         .catch(err => {
-          this.$swal({
-            icon: 'error',
-            title: '發生錯誤',
-            text: err.response.data.message
-          })
+          handleError(err, this)
         })
     },
     deleteReply(id, index) {
-      let data = {}
-      data[0] = this.messages[index]
-      delete data[0]._id
-      delete data[0].replyed
-      data[0].reply = ''
-      this.axios.patch(process.env.VUE_APP_API + '/message/reply/' + id, data[0])
+      let data = {
+        user: this.messages[index].user,
+        userId: this.messages[index].userId,
+        message: this.messages[index].message,
+        reply: ''
+      }
+      
+      this.axios.patch(API.message.reply(id), data)
         .then(res => {
           if (res.data.success) {
-            this.messages[index].replyed = true
-            this.reply = ''
-            location.reload()
+            this.messages[index].replyed = false
+            this.messages[index].reply = ''
+            handleSuccess('刪除回覆成功', this)
           } else {
             this.$swal({
               icon: 'error',
-              title: '發生錯誤',
+              title: '刪除失敗',
               text: res.data.message
             })
           }
         })
         .catch(err => {
-          this.$swal({
-            icon: 'error',
-            title: '發生錯誤',
-            text: err.response.data.message
-          })
+          handleError(err, this)
+        })
+    },
+    loadMessages() {
+      this.loading = true
+      this.axios.get(API.message.list)
+        .then(res => {
+          if (res.data.success) {
+            this.messages = res.data.result.map(message => ({
+              ...message,
+              reply: message.reply || '',
+              replyed: message.reply && message.reply.length > 0
+            }))
+          }
+        })
+        .catch(err => {
+          handleError(err, this)
+        })
+        .finally(() => {
+          this.loading = false
         })
     }
   },
   mounted() {
-    this.axios.get(process.env.VUE_APP_API + '/message/messages')
-      .then(res => {
-        if(res.data.success){
-          this.messages = res.data.result
-          this.messages.map(message => {
-            message.reply = message.reply || ""
-            if (message.reply === undefined || message.reply.length === 0) {
-              message.replyed = false
-            } else {
-              message.replyed = true
-            }
-          })
-        }
-      })
-      .catch(err => {
-        console.log(err)
-        this.$swal({
-          icon: 'error',
-          title: '錯誤',
-          text: err.response.data.message
-        })
-      })
+    this.loadMessages()
   }
 }
 </script>

@@ -58,6 +58,9 @@
 </template>
 
 <script>
+import API from './api'
+import { handleError, handleSuccess } from './utils/errorHandler'
+
 export default {
   name: 'App',
   data () {
@@ -118,109 +121,98 @@ export default {
           userName: this.form.userName,
           gender: this.form.gender
         }
-        this.axios.post(process.env.VUE_APP_API + '/users/', data)
+        this.axios.post(API.users.register, data)
           .then(res => {
             if (res.data.success) {
-              this.$swal({
-                icon: 'success',
-                title: '註冊成功',
-                text: '歡迎加入琴音部會員'
-              })
-              this.form.userName = ''
-              this.form.gender = ''
-              this.form.account = ''
-              this.form.password = ''
-              this.form.passwordCheck = ''
-              location.reload()
+              handleSuccess('註冊成功，歡迎加入琴音部會員', this)
+              this.resetForm()
+              this.$bvModal.hide('signUp')
             } else {
               this.$swal({
                 icon: 'error',
-                title: '發生錯誤',
+                title: '註冊失敗',
                 text: res.data.message
               })
             }
           })
           .catch(err => {
-            this.$swal({
-              icon: 'error',
-                title: '發生錯誤',
-                text: err.response.data.message
-            })
+            handleError(err, this)
           })
       }
     },
+    resetForm () {
+      this.form.userName = ''
+      this.form.gender = ''
+      this.form.account = ''
+      this.form.password = ''
+      this.form.passwordCheck = ''
+    },
     onReset () {
-      if (this.form.userName === undefined) {
-        this.form.account = ''
-        this.form.password = ''
+      if (this.logInForm.account !== undefined && this.form.userName === undefined) {
+        this.logInForm.account = ''
+        this.logInForm.password = ''
       } else {
-        this.form.userName = ''
-        this.form.gender = ''
-        this.form.account = ''
-        this.form.password = ''
-        this.form.passwordCheck = ''
+        this.resetForm()
       }
     },
     login () {
       if (this.accountState && this.passwordState) {
-        this.axios.post(process.env.VUE_APP_API + '/users/login', this.logInForm)
+        this.axios.post(API.users.login, this.logInForm)
           .then(res => {
             if (res.data.success) {
               this.$store.commit('login', res.data.result[0])
-              this.$swal({
-                icon: 'success',
-                title: '登入成功'
-              })
-              location.reload()
+              handleSuccess('登入成功', this)
+              this.logInForm.account = ''
+              this.logInForm.password = ''
+              this.$bvModal.hide('logIn')
+              // 如果在需要登入的頁面，保持在當前頁面，否則重新整理頁面數據
+              if (this.$route.meta.requiresAuth) {
+                this.$router.go(0)
+              }
             } else {
               this.$swal({
                 icon: 'error',
-                title: '發生錯誤',
+                title: '登入失敗',
                 text: res.data.message
               })
             }
           })
           .catch(err => {
-            this.$swal({
-              icon: 'error',
-                title: '發生錯誤',
-                text: err.response.data.message
-            })
+            handleError(err, this)
           })
       }
     },
     logout () {
-      this.axios.delete(process.env.VUE_APP_API + '/users/logout')
+      this.axios.delete(API.users.logout)
         .then(res => {
           if (res.data.success) {
-            alert('登出成功')
+            handleSuccess('登出成功', this)
             this.$store.commit('logout')
-
             if (this.$route.path !== '/') {
               this.$router.push('/')
             }
           } else {
             this.$swal({
               icon: 'error',
-              title: '錯誤',
+              title: '登出失敗',
               text: res.data.message
             })
           }
         })
         .catch(error => {
-          this.$swal({
-            icon: 'error',
-            title: '錯誤',
-            text: error.response.data.message
-          })
+          handleError(error, this)
         })
     },
     heartbeat () {
-      this.axios.get(process.env.VUE_APP_API + '/users/heartbeat')
+      this.axios.get(API.users.heartbeat)
         .then(res => {
           if (this.user.id.length > 0) {
             if (!res.data) {
-              alert('登入時效已過')
+              this.$swal({
+                icon: 'warning',
+                title: '登入時效已過',
+                text: '請重新登入'
+              })
               this.$store.commit('logout')
               if (this.$route.path !== '/') {
                 this.$router.push('/')
@@ -238,9 +230,10 @@ export default {
   },
   mounted () {
     this.heartbeat()
+    // 延長心跳檢測間隔至 30 秒，減少伺服器負擔
     setInterval(() => {
       this.heartbeat()
-    }, 5000)
+    }, 30000)
   }
 }
 </script>
