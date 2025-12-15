@@ -1,77 +1,63 @@
-import md5 from 'md5'
+import bcrypt from 'bcrypt'
 import users from '../models/users.js'
 
-export const create = async (req, res) => {
-  if (!req.headers['content-type'] || !req.headers['content-type'].includes('application/json')) {
-    res.status(400).send({ success: false, message: '資料格式不符' })
-    return
-  }
-
+export const create = async (req, res, next) => {
   try {
-    if (req.body.password.length < 6) {
-      res.status(400).send({ success: false,message: '密碼長度需大於 6 個字' })
-    } else if (req.body.password.length > 16) {
-      res.status(400).send({ success: false, message: '密碼長度需小於 16 個字' })
-    } else {
-      await users.create({
-        account: req.body.account,
-        password: md5(req.body.password),
-        userName: req.body.userName,
-        gender: req.body.gender || "",
-        messageAble: true
-      })
-      res.status(200).send({ success: true, message: '' })
-    }
-  } catch (error) {
-    if (error.name === 'ValidationError') {
-      const key = Object.keys(error.errors)[0]
-      const message = error.errors[key].message
-      res.status(400).send({ success: false,message })
-    } else if (error.name === 'MongoError' && error.code === 11000) {
-      res.status(400).send({ success: false, message: '帳號已使用' })
-    } else {
-      res.status(500).send({ success: false, message: '伺服器錯誤' })
-    }
-  }
-}
-
-export const login = async (req, res) => {
-  if (!req.headers['content-type'] || !req.headers['content-type'].includes('application/json')) {
-    res.status(400).send({ success: false, message: '資料格式不符' })
-    return
-  }
-
-  try {
-    const result = await users.find({
+    // 使用 bcrypt 加密密碼，盤雜輪數 10
+    const hashedPassword = await bcrypt.hash(req.body.password, 10)
+    
+    await users.create({
       account: req.body.account,
-      password: md5(req.body.password)
-    }, '-password')
-
-    if (result.length === 0) {
-      res.status(404).send({ success: false, message: '帳號或密碼錯誤' })
-    } else {
-      req.session.user = result[0]
-      res.status(200).send({ success: true, message: '', result })
-    }
+      password: hashedPassword,
+      userName: req.body.userName,
+      gender: req.body.gender || '',
+      messageAble: true
+    })
+    
+    res.status(200).send({ success: true, message: '註冊成功' })
   } catch (error) {
-    if (error.name === 'ValidationError') {
-      const key = Object.keys(error.errors)[0]
-      const message = error.errors[key].message
-      res.status(400).send({ success: false, message })
-    } else {
-      res.status(500).send({ success: false, message: '伺服器錯誤' })
-    }
+    next(error)
   }
 }
 
-export const logout = async (req, res) => {
+export const login = async (req, res, next) => {
+  try {
+    // 查找使用者（包含密碼欄位）
+    const user = await users.findOne({ account: req.body.account })
+
+    if (!user) {
+      return res.status(401).send({ success: false, message: '帳號或密碼錯誤' })
+    }
+
+    // 使用 bcrypt 驗證密碼
+    const isPasswordValid = await bcrypt.compare(req.body.password, user.password)
+    
+    if (!isPasswordValid) {
+      return res.status(401).send({ success: false, message: '帳號或密碼錯誤' })
+    }
+
+    // 將使用者資訊儲存到 session（不包含密碼）
+    const userWithoutPassword = user.toObject()
+    delete userWithoutPassword.password
+    req.session.user = userWithoutPassword
+    
+    res.status(200).send({ 
+      success: true, 
+      message: '登入成功', 
+      result: [userWithoutPassword] 
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+export const logout = async (req, res, next) => {
   req.session.destroy(error => {
     if (error) {
-      res.status(500).send({ success: false, message: '伺服器錯誤' })
-    } else {
-      res.clearCookie()
-      res.status(200).send({ success: true, message: '' })
+      return next(error)
     }
+    res.clearCookie('connect.sid')
+    res.status(200).send({ success: true, message: '登出成功' })
   })
 }
 
@@ -83,138 +69,77 @@ export const heartbeat = async (req, res) => {
   res.status(200).send(isLogin)
 }
 
-export const user = async (req, res) => {
-  if (req.session.user === undefined) {
-    res.status(401).send({ success: false, message: '未登入' })
-  }
-
+export const user = async (req, res, next) => {
   try {
-    let result = await users.findById(req.session.user._id, '-password').populate('tickets.t_id')
+    const result = await users.findById(req.session.user._id, '-password').populate('tickets.t_id')
     res.status(200).send({ success: true, message: '', result })
   } catch (error) {
-    if (error.name === 'ValidationError') {
-      const key = Object.keys(error.errors)[0]
-      const message = error.errors[key].message
-      res.status(400).send({ success: false, message })
-    } else {
-      res.status(500).send({ success: false, message: '伺服器錯誤' })
+    next(error)
     }
   }
 }
 
-export const edit = async (req, res) => {
-  if (req.session.user === undefined) {
-    res.status(401).send({ success: false, message: '未登入' })
-  }
-  if (!req.headers['content-type'] || !req.headers['content-type'].includes('application/json')) {
-    res.status(400).send({ success: false, message: '資料格式不符' })
-    return
-  }
-
+export const edit = async (req, res, next) => {
   try {
     await users.findByIdAndUpdate(req.session.user._id, req.body, { new: true })
-    res.status(200).send({ success: true, message: '' })
+    res.status(200).send({ success: true, message: '更新成功' })
   } catch (error) {
-    console.log(error)
-    if (error.name === 'ValidationError') {
-      const key = Object.keys(error.errors)[0]
-      const message = error.errors[key].message
-      res.status(400).send({ success: false, message })
-    } else {
-      res.status(500).send({ success: false, message: '伺服器錯誤' })
-    }
+    next(error)
   }
 }
 
-export const bookTicket = async (req, res) => {
-  if (req.session.user === undefined) {
-    res.status(401).send({ success: false, message: '未登入' })
-    return
-  }
-  if (!req.headers['content-type'] || !req.headers['content-type'].includes('application/json')) {
-    res.status(400).send({ success: false, message: '資料格式不符' })
-    return
-  }
-
+export const bookTicket = async (req, res, next) => {
   try {
-    await users.findByIdAndUpdate(req.session.user._id,
+    await users.findByIdAndUpdate(
+      req.session.user._id,
       {
         $push: {
-          tickets: [
-            {
-              t_id: req.body.t_id,
-              quantity: req.body.quantity,
-              paid: false
-            }
-          ]
+          tickets: {
+            t_id: req.body.t_id,
+            quantity: req.body.quantity,
+            paid: false
+          }
         }
       },
       { new: true }
     )
-    res.status(200).send({ success: true, message: '' })
+    res.status(200).send({ success: true, message: '訂票成功' })
   } catch (error) {
-    console.log(error)
-    if (error.name === 'ValidationError') {
-      const key = Object.keys(error.errors)[0]
-      const message = error.errors[key].message
-      res.status(400).send({ success: false, message })
-    } else {
-      res.status(500).send({ success: false, message: '伺服器錯誤' })
-    }
+    next(error)
   }
 }
 
-export const mute = async (req, res) => {
-  if (req.session.user === undefined) {
-    res.status(401).send({ success: false, message: '未登入' })
-  }
-  if (!req.headers['content-type'] || !req.headers['content-type'].includes('application/json')) {
-    res.status(400).send({ success: false, message: '資料格式錯誤' })
-  }
-
+export const mute = async (req, res, next) => {
   try {
     await users.findByIdAndUpdate(req.params.id, req.body, { new: true })
-    res.status(200).send({ success: true, message: '' })
+    res.status(200).send({ success: true, message: '更新成功' })
   } catch (error) {
-    console.log(error)
-    if (error.name === 'ValidationError') {
-      const key = Object.keys(error.errors)[0]
-      const message = error.errors[key].message
-      res.status(400).send({ success: false, message })
-    } else {
-      res.status(500).send({ success: false, message: '伺服器錯誤' })
-    }
+    next(error)
   }
 }
 
-export const findUser = async (req, res) => {
-  if (req.session.user === undefined) {
-    res.status(401).send({ success: false, message: '未登入' })
-  }
-
+export const findUser = async (req, res, next) => {
   try {
-    let result = await users.findById(req.params.id, '-password, -tickets')
+    const result = await users.findById(req.params.id, '-password -tickets')
+    if (!result) {
+      return res.status(404).send({ success: false, message: '找不到該使用者' })
+    }
     res.status(200).send({ success: true, message: '', result })
   } catch (error) {
-    if (error.name === 'ValidationError') {
-      const key = Object.keys(error.errors)[0]
-      const message = error.errors[key].message
-      res.status(400).send({ success: false, message })
-    } else {
-      res.status(500).send({ success: false, message: '伺服器錯誤' })
-    }
+    next(error)
   }
 }
 
-export const sold = async (req, res) => {
+export const sold = async (req, res, next) => {
   try {
-    let datas = await users.find()
-    let result = []
-    let id = req.params.id
-    datas.map(data => {
-      if (data.tickets.length > 0) {
-        data.tickets.map(ticket => {
-          if (ticket.t_id == id) {
+    const datas = await users.find()
+    const id = req.params.id
+    const result = []
+    
+    datas.forEach(data => {
+      if (data.tickets && data.tickets.length > 0) {
+        data.tickets.forEach(ticket => {
+          if (ticket.t_id.toString() === id) {
             result.push({
               uid: data._id,
               name: data.userName,
@@ -225,15 +150,9 @@ export const sold = async (req, res) => {
         })
       }
     })
+    
     res.status(200).send({ success: true, message: '', result })
   } catch (error) {
-    console.log(error)
-    if (error.name === 'ValidationError') {
-      const key = Object.keys(error.errors)[0]
-      const message = error.errors[key].message
-      res.status(400).send({ success: false, message })
-    } else {
-      res.status(500).send({ success: false, message: '伺服器錯誤' })
-    }
+    next(error)
   }
 }
